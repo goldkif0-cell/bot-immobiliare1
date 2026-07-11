@@ -1,15 +1,16 @@
 import streamlit as st
 import csv
 import json
+import os
 from groq import Groq
 
 # --- CONFIGURAZIONE ---
 st.set_page_config(page_title="Immobiliare Premium", page_icon="🏠")
 st.title("🏠 Immobiliare Premium")
 
-# Inserisci la tua chiave API
-API_KEY = ""
-client = Groq(api_key=API_KEY)
+# Recupera la chiave dai Secrets di Streamlit (non scriverla più qui dentro!)
+api_key = st.secrets["GROQ_API_KEY"]
+client = Groq(api_key=api_key)
 
 # --- PROMPT DI SISTEMA CORRETTO ---
 PROMPT_SISTEMA = """
@@ -36,11 +37,9 @@ if "messages" not in st.session_state:
     st.session_state.scheda = {"nome": "N/D", "servizio": "N/D", "budget": "N/D", "telefono": "N/D", "orario": "N/D", "giorno": "N/D"}
 
 def pulisci_visualizzazione(text):
-    # Rimuove il JSON e il tag di chiusura dalla vista dell'utente
     text = text.split("[DATA:")[0].replace("[CHIUDI_CHAT]", "").strip()
     return text
 
-# Funzione per il design del riepilogo
 def mostra_riepilogo():
     s = st.session_state.scheda
     st.markdown("---")
@@ -48,21 +47,19 @@ def mostra_riepilogo():
     st.subheader("📋 Riepilogo Dati Cliente")
     col1, col2 = st.columns(2)
     with col1:
-        st.write(f"**👤 Nome:** {s['nome']}")
-        st.write(f"**🏠 Servizio:** {s['servizio']}")
-        st.write(f"**💰 Budget:** {s['budget']}")
+        st.write(f"*👤 Nome:* {s['nome']}")
+        st.write(f"*🏠 Servizio:* {s['servizio']}")
+        st.write(f"*💰 Budget:* {s['budget']}")
     with col2:
-        st.write(f"**📞 Telefono:** {s['telefono']}")
-        st.write(f"**🕒 Orario:** {s['orario']}")
-        st.write(f"**📅 Giorno:** {s['giorno']}")
+        st.write(f"*📞 Telefono:* {s['telefono']}")
+        st.write(f"*🕒 Orario:* {s['orario']}")
+        st.write(f"*📅 Giorno:* {s['giorno']}")
 
-# Visualizzazione Chat
 for msg in st.session_state.messages:
     if msg["role"] != "system":
         with st.chat_message(msg["role"]):
             st.markdown(pulisci_visualizzazione(msg["content"]))
 
-# Input Utente
 if user_input := st.chat_input("Scrivi qui..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"): st.markdown(user_input)
@@ -80,7 +77,6 @@ if user_input := st.chat_input("Scrivi qui..."):
     
     st.session_state.messages.append({"role": "assistant", "content": full_res})
 
-    # Parsing dati
     if "[DATA:" in full_res:
         try:
             dati_str = full_res.split("[DATA:")[1].split("]")[0]
@@ -89,10 +85,9 @@ if user_input := st.chat_input("Scrivi qui..."):
                 if v != "N/D": st.session_state.scheda[k] = v
         except: pass
 
-    # Salvataggio finale
     if "[CHIUDI_CHAT]" in full_res:
         with open("appuntamenti.csv", "a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(st.session_state.scheda.values())
-        mostra_riepilogo() # Mostra il design pulito
+        mostra_riepilogo()
         st.stop()
